@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Đăng nhập</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 300px; margin: auto; }
+        h2 { text-align: center; color: #333; }
+        form p { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #555; }
+        input[type="text"], input[type="password"] { width: calc(100% - 22px); padding: 10px; border: 1px solid #ddd; border-radius: 3px; }
+        button { background-color: #5cb85c; color: white; padding: 10px 15px; border: none; border-radius: 3px; cursor: pointer; width: 100%; }
+        button:hover { background-color: #4cae4c; }
+        .errorlist { list-style-type: none; padding: 0; color: red; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Đăng nhập Hệ thống</h2>
+        {% if form.errors %}
+            <p style="color: red;">Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng thử lại.</p>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Đăng nhập</button>
+        </form>
+    </div>
+</body>
+</html>
