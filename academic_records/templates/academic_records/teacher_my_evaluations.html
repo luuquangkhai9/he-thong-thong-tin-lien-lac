@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+<p style="margin-bottom: 20px;">
+    <a href="{% url 'academic_records:add_evaluation' %}" class="btn btn-primary" style="background-color: #007bff; color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px; display:inline-block;">
+        + Viết Đánh giá/Nhận xét mới
+    </a>
+</p>
+
+{% if evaluations %}
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Học sinh</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Loại Đánh giá</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Môn học (nếu có)</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Ngày Đánh giá</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Nội dung (rút gọn)</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for evaluation in evaluations %}
+                <tr {% if forloop.counter0|divisibleby:2 %}style="background-color: #f9f9f9;"{% endif %}>
+                    <td style="border: 1px solid #ddd; padding: 8px;">
+                        {% if evaluation.student and evaluation.student.user %}
+                            {{ evaluation.student.user.get_full_name|default:evaluation.student.user.username }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ evaluation.get_evaluation_type_display }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ evaluation.subject.name|default:"-" }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ evaluation.evaluation_date|date:"d/m/Y" }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ evaluation.content|truncatewords_html:15|linebreaksbr }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">
+                        <a href="{% url 'academic_records:edit_evaluation' pk=evaluation.pk %}">Sửa</a>
+                        {# Thêm link xem chi tiết nếu cần một trang riêng không phải form sửa #}
+                        {# Ví dụ: <a href="#">Xem chi tiết</a> #}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>Bạn chưa tạo đánh giá/nhận xét nào.</p>
+{% endif %}
+
+{% endblock %}

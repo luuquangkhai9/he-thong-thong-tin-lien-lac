@@ -38,6 +38,8 @@
                 <a href="{% url 'academic_records:teacher_view_class_rewards_discipline' %}">KT/KL Lớp CN</a>
                 {# Link cho Giáo viên tạo Khen thưởng/Kỷ luật #}
                 <a href="{% url 'academic_records:add_reward_discipline' %}">Tạo KT/KL (GV)</a>
+                <a href="{% url 'academic_records:add_evaluation' %}">Viết Nhận xét</a> {# <<--- LINK NÀY --- #}
+                <a href="{% url 'academic_records:teacher_my_evaluations' %}">Đánh giá của tôi</a> {# <<--- LINK NÀY --- #}
              {% endif %}
             {# --- KẾT THÚC LINK MỚI --- #}
             {# --- LINK MỚI CHO TIN NHẮN --- #}
@@ -52,6 +54,7 @@
             {% if user.role.name == 'STUDENT' or user.role.name == 'PARENT' %}
                 <a href="{% url 'academic_records:view_scores' %}">Xem Điểm</a>
                 <a href="{% url 'academic_records:view_reward_discipline' %}">Khen thưởng/Kỷ luật</a> {# <<--- LINK MỚI --- #}
+                <a href="{% url 'academic_records:view_evaluations' %}">Xem Nhận xét</a> {# <<--- LINK NÀY --- #}
             {% endif %}
             {# --- KẾT THÚC LINK MỚI --- #}            
             <span style="color: white; margin: 0 15px;">Chào, {{ user.username }}!</span> {# Thêm style cho dễ nhìn #}
