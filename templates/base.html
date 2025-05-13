@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Hệ thống Thông tin Liên lạc{% endblock %}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; color: #333; }
+        header { background-color: #343a40; color: white; padding: 1em 0; text-align: center; }
+        nav { background-color: #495057; padding: 0.5em; text-align: center;}
+        nav a, nav form button { color: white; margin: 0 15px; text-decoration: none; font-weight: bold; } /* Áp dụng style cho cả link và button trong form */
+        nav a:hover, nav form button:hover { text-decoration: underline; } /* Hover cho cả link và button */
+        .container { width: 80%; margin: 20px auto; padding: 20px; background-color: white; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); min-height: calc(100vh - 200px); /* Đảm bảo container đủ cao để footer không che nội dung */}
+        footer { text-align: center; padding: 1em 0; background-color: #343a40; color: white; /* Bỏ position: fixed; */ margin-top: 20px; /* Thêm margin-top để không dính vào container */}
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <h1>Hệ thống Thông tin Liên lạc Nhà trường</h1>
+    </header>
+    <nav>
+        <a href="{% url 'homepage' %}">Trang chủ (Thông báo)</a> {# Thay đổi 'communications:notification_list' thành 'homepage' nếu bạn đã đổi tên URL cho trang chủ #}
+        {% if user.is_authenticated %}
+            <a href="{% url 'communications:submit_request_form' %}">Gửi Đơn từ</a> {# <<--- LINK MỚI ĐÃ THÊM VÀO ĐÂY --- #}
+            <a href="{% url 'communications:my_submitted_requests' %}">Đơn từ của tôi</a> {# <<--- LINK MỚI --- #}
+            {% if user.is_staff and user.department %}
+                <a href="{% url 'communications:department_request_list' %}">Đơn từ Phòng ban</a>
+            {% endif %}    
+            {# --- LINK MỚI CHO GIÁO VIÊN --- #}
+            {% if user.role.name == 'TEACHER' %} {# Điều kiện này cần khớp với cách bạn lưu vai trò Giáo viên #}
+                <a href="{% url 'communications:teacher_request_list' %}">Đơn từ cho GV</a>
+            {% endif %}
+            {# --- KẾT THÚC LINK MỚI --- #}
+            <span style="color: white; margin: 0 15px;">Chào, {{ user.username }}!</span> {# Thêm style cho dễ nhìn #}
+            <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" style="background:none; border:none; padding:0; color:white; cursor:pointer; font-weight:bold; text-decoration:none; font-family: Arial, sans-serif; font-size: inherit;"> {# Chỉnh style cho giống link #}
+                    Đăng xuất
+                </button>
+            </form>
+        {% else %}
+            <a href="{% url 'login' %}">Đăng nhập</a>
+        {% endif %}
+    </nav>
+    <main class="container">
+        {% block content %}
+        {% endblock %}
+    </main>
+    <footer>
+        <p>&copy; {% now "Y" %} Trường Đại học Công nghệ - ĐHQGHN. Phát triển bởi Nhóm Sinh viên.</p>
+    </footer>
+</body>
+</html>

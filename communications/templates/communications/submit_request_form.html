@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+{% if messages %}
+    <ul class="messages" style="list-style-type: none; padding: 0;">
+        {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}" style="padding: 10px; margin-bottom: 10px; border-radius: 3px; color: white; {% if message.tags == 'success' %}background-color: #5cb85c;{% elif message.tags == 'error' %}background-color: #d9534f;{% endif %}"{% endif %}>
+                {{ message }}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    {{ form.non_field_errors }} {# Hiển thị lỗi chung của form #}
+
+    {% for field in form %}
+        <p>
+            {{ field.label_tag }}<br>
+            {{ field }}
+            {% if field.help_text %}
+                <small style="color: grey">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+                <p style="color: red">{{ error }}</p>
+            {% endfor %}
+        </p>
+    {% endfor %}
+
+    <button type="submit" style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Gửi Đơn</button>
+</form>
+{% endblock %}

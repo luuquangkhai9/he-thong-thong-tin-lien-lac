@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Danh sách Thông báo{% endblock %}
+
+{% block content %}
+<h2>Danh sách Thông báo</h2>
+{% if user.is_authenticated %}
+    {% if notifications %}
+        <ul>
+            {% for notification in notifications %}
+                <li>
+                    <h3>{{ notification.title }}</h3>
+                    <p><small>Gửi bởi: {{ notification.sent_by.username|default:"Hệ thống" }} lúc {{ notification.created_time|date:"d/m/Y H:i" }}</small></p>
+                    <div>{{ notification.content|safe|linebreaks }}</div>
+                    <hr>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Không có thông báo nào.</p>
+    {% endif %}
+{% else %}
+    <p>Vui lòng <a href="{% url 'login' %}">đăng nhập</a> để xem thông báo.</p>
+{% endif %}
+{% endblock %}

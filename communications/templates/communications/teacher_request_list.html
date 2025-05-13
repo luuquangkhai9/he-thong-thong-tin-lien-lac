@@ -1,0 +1,50 @@
+    {% extends "base.html" %}
+
+    {% block title %}{{ page_title }}{% endblock %}
+
+    {% block content %}
+    <h2>{{ page_title }}</h2>
+
+    {% if teacher_requests %}
+        <style>
+            .request-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            .request-table th, .request-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .request-table th { background-color: #f2f2f2; }
+            .request-table tr:nth-child(even){background-color: #f9f9f9;}
+            .request-table tr:hover {background-color: #e9ecef;}
+            .request-table a { color: #007bff; text-decoration: none; }
+            .request-table a:hover { text-decoration: underline; }
+        </style>
+        <table class="request-table">
+            <thead>
+                <tr>
+                    <th>Tiêu đề</th>
+                    <th>Người gửi</th>
+                    <th>Loại đơn</th>
+                    <th>Ngày gửi</th>
+                    <th>Trạng thái</th>
+                    <th>Phòng Ban Được Gửi (Nếu có)</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req_form in teacher_requests %}
+                    <tr>
+                        <td>{{ req_form.title }}</td>
+                        <td>{{ req_form.submitted_by.username }}</td>
+                        <td>{{ req_form.get_form_type_display }}</td>
+                        <td>{{ req_form.submission_date|date:"d/m/Y H:i" }}</td>
+                        <td>{{ req_form.get_status_display }}</td>
+                        <td>{{ req_form.assigned_department.name|default:"Không" }}</td>
+                        <td>
+                            <a href="{% url 'communications:teacher_respond_request' pk=req_form.pk %}">Xem/Phản hồi</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Không có đơn từ/kiến nghị nào được gán cho bạn cần xử lý.</p>
+    {% endif %}
+    {% endblock %}
+    

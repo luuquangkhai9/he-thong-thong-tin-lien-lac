@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+<div class="request-details" style="margin-bottom: 30px; padding: 15px; background-color: #f9f9f9; border: 1px solid #eee;">
+    <h4>Thông tin Đơn từ/Kiến nghị</h4>
+    <p><strong>Tiêu đề:</strong> {{ request_form_instance.title }}</p>
+    <p><strong>Người gửi:</strong> {{ request_form_instance.submitted_by.username }}</p>
+    <p><strong>Loại đơn:</strong> {{ request_form_instance.get_form_type_display }}</p>
+    <p><strong>Ngày gửi:</strong> {{ request_form_instance.submission_date|date:"d/m/Y H:i" }}</p>
+    <p><strong>Trạng thái hiện tại:</strong> {{ request_form_instance.get_status_display }}</p>
+    {% if request_form_instance.related_student %}
+        <p><strong>Học sinh liên quan:</strong> {{ request_form_instance.related_student.user.get_full_name|default:request_form_instance.related_student.user.username }}</p>
+    {% endif %}
+    <p><strong>Nội dung chi tiết của đơn:</strong></p>
+    <div style="white-space: pre-wrap; background-color: #fff; padding: 10px; border: 1px solid #ddd;">
+        {{ request_form_instance.content|linebreaksbr }}
+    </div>
+</div>
+
+<hr>
+
+<h3>Phản hồi từ Phòng Ban</h3>
+<form method="post" novalidate>
+    {% csrf_token %}
+    {{ response_form.non_field_errors }}
+
+    {% for field in response_form %}
+        <p>
+            {{ field.label_tag }}<br>
+            {{ field }}
+            {% if field.help_text %}
+                <small style="color: grey">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+                <p style="color: red">{{ error }}</p>
+            {% endfor %}
+        </p>
+    {% endfor %}
+
+    <button type="submit" style="background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Lưu Phản hồi và Cập nhật</button>
+    <a href="{% url 'communications:department_request_list' %}" style="margin-left: 10px; color: #6c757d; text-decoration: none;">Quay lại Danh sách</a>
+</form>
+
+{% endblock %}

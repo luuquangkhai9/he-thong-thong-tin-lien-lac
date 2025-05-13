@@ -81,38 +81,36 @@ class RequestFormAdmin(admin.ModelAdmin):
         'status',
         'submission_date',
         'assigned_department',
+        'display_assigned_teachers', # Thêm để hiển thị giáo viên
         'response_date'
     )
-    list_filter = ('status', 'form_type', 'submission_date', 'assigned_department')
+    list_filter = ('status', 'form_type', 'submission_date', 'assigned_department', 'assigned_teachers') # Thêm assigned_teachers
     search_fields = (
         'title',
         'content',
-        'submitted_by__username', # Tìm theo username người gửi
-        'related_student__user__username' # Tìm theo username của học sinh liên quan
+        'submitted_by__username',
+        'related_student__user__username',
+        'assigned_teachers__username' # Tìm theo username của giáo viên được gán
     )
-    # Sắp xếp các trường trong form chỉnh sửa chi tiết
     fieldsets = (
         ('Thông tin Đơn', {
             'fields': ('title', 'form_type', 'submitted_by', 'related_student', 'content')
         }),
+        ('Đối tượng Xử lý', { # Đổi tên nhóm hoặc thêm nhóm mới
+            'fields': ('assigned_department', 'assigned_teachers') # Thêm assigned_teachers
+        }),
         ('Xử lý và Trạng thái', {
-            'fields': ('status', 'assigned_department') # , 'assigned_to_staff' nếu bạn đã thêm trường này
+            'fields': ('status',)
         }),
         ('Phản hồi từ Nhà trường', {
-            'classes': ('collapse',), # Cho phép thu gọn/mở rộng
+            'classes': ('collapse',),
             'fields': ('response_content', 'responded_by', 'response_date')
         }),
     )
-    # Các trường chỉ đọc (ví dụ: không cho sửa người gửi và ngày gửi sau khi đã tạo)
     readonly_fields = ('submission_date',)
-    # autocomplete_fields giúp chọn ForeignKey dễ dàng hơn nếu danh sách dài
-    #autocomplete_fields = ['submitted_by', 'related_student', 'assigned_department', 'responded_by']
-    # Trong communications/admin.py, lớp RequestFormAdmin
-    autocomplete_fields = ['submitted_by', 'assigned_department', 'responded_by'] # Bỏ 'related_student' đi
+    autocomplete_fields = ['submitted_by', 'related_student', 'assigned_department', 'responded_by'] # Giữ nguyên
+    filter_horizontal = ('assigned_teachers',) # Widget tốt cho ManyToManyField
 
-    # Tùy chỉnh cách hiển thị các trường ForeignKey
-    # def formfield_for_foreignkey(self, db_field, request, **kwargs):
-    #     if db_field.name == "related_student":
-    #         kwargs["queryset"] = StudentProfile.objects.select_related('user').order_by('user__last_name', 'user__first_name')
-    #     # Thêm các tùy chỉnh khác nếu cần
-    #     return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    def display_assigned_teachers(self, obj):
+        return ", ".join([teacher.username for teacher in obj.assigned_teachers.all()])
+    display_assigned_teachers.short_description = 'Giáo viên nhận'

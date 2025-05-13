@@ -163,13 +163,20 @@ class Message(models.Model):
 # from school_data.models import Department # Hoặc dùng string
 # from accounts.models import StudentProfile # Hoặc dùng string
 
+from django.db import models
+from django.conf import settings # Để tham chiếu đến Custom User Model
+# from accounts.models import Role, StudentProfile (nếu bạn dùng trực tiếp)
+# from school_data.models import Class, Department (nếu bạn dùng trực tiếp)
+from django.utils import timezone # Thêm import này nếu bạn dùng timezone.now() trong model Message
+
+# ... (model Notification, Conversation, Message đã có ở trên) ...
+
 class RequestForm(models.Model):
     FORM_TYPE_CHOICES = [
         ('LEAVE_APPLICATION', 'Đơn xin nghỉ học'),
         ('GRADE_APPEAL', 'Đơn phúc khảo điểm'),
         ('GENERAL_REQUEST', 'Kiến nghị/Đề xuất chung'),
         ('FEEDBACK', 'Góp ý'),
-        # Thêm các loại đơn khác nếu cần
     ]
 
     STATUS_CHOICES = [
@@ -180,14 +187,12 @@ class RequestForm(models.Model):
         ('CLOSED', 'Đã đóng'),
     ]
 
-    # Người gửi đơn
     submitted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE, # Nếu người gửi bị xóa, đơn của họ cũng bị xóa
+        on_delete=models.CASCADE,
         related_name='submitted_forms',
         verbose_name="Người gửi"
     )
-    # Nếu đơn liên quan đến một học sinh cụ thể
     related_student = models.ForeignKey(
         'accounts.StudentProfile',
         on_delete=models.SET_NULL,
@@ -202,23 +207,25 @@ class RequestForm(models.Model):
     submission_date = models.DateTimeField(auto_now_add=True, verbose_name="Ngày gửi")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SUBMITTED', verbose_name="Trạng thái")
 
-    # Thông tin xử lý từ phía nhà trường
     assigned_department = models.ForeignKey(
         'school_data.Department',
         on_delete=models.SET_NULL,
         null=True,
-        blank=True,
+        blank=True, # Cho phép không chọn phòng ban (nếu gửi cho giáo viên)
         related_name='assigned_request_forms',
         verbose_name="Phòng Ban xử lý"
     )
-    # Có thể gán cho một hoặc nhiều giáo viên/nhân viên cụ thể để xử lý
-    # assigned_to_staff = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL,
-    #     related_name='handling_request_forms',
-    #     blank=True,
-    #     limit_choices_to={'role__name__in': ['TEACHER', 'SCHOOL_ADMIN', 'ADMIN']}, # Chỉ nhân viên/giáo viên
-    #     verbose_name="Người xử lý"
-    # )
+
+    # --- THÊM TRƯỜNG MỚI assigned_teachers VÀO ĐÂY ---
+    assigned_teachers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='received_request_forms', # Các đơn mà giáo viên này nhận/xử lý
+        blank=True, # Cho phép không chọn giáo viên (nếu gửi cho phòng ban)
+        limit_choices_to={'role__name': 'TEACHER'}, # Chỉ những User có vai trò là Giáo viên
+        verbose_name="Giáo viên xử lý/nhận đơn"
+    )
+    # --- KẾT THÚC PHẦN THÊM MỚI ---
+
     response_content = models.TextField(blank=True, null=True, verbose_name="Nội dung phản hồi từ nhà trường")
     response_date = models.DateTimeField(null=True, blank=True, verbose_name="Ngày phản hồi")
     responded_by = models.ForeignKey(
@@ -226,13 +233,10 @@ class RequestForm(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='responded_request_forms',
-        limit_choices_to={'is_staff': True}, # Chỉ những người là staff mới có thể phản hồi
+        related_name='responded_request_forms', # Đổi tên related_name này để tránh xung đột với assigned_teachers
+        limit_choices_to={'is_staff': True},
         verbose_name="Người phản hồi"
     )
-    # Có thể thêm file đính kèm nếu cần:
-    # attachment = models.FileField(upload_to='request_attachments/', blank=True, null=True, verbose_name="Tài liệu đính kèm")
-
 
     def __str__(self):
         return f"{self.get_form_type_display()} từ {self.submitted_by.username} - {self.title}"

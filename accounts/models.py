@@ -26,6 +26,15 @@ class User(AbstractUser):
     # Các trường thông tin chung khác có thể có cho tất cả user nếu cần, ví dụ:
     # phone_number = models.CharField(max_length=15, blank=True, null=True, verbose_name="Số điện thoại")
     # avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, verbose_name="Ảnh đại diện")
+    # --- THÊM TRƯỜNG MỚI Ở ĐÂY ---
+    department = models.ForeignKey(
+        'school_data.Department',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True, # Không phải tất cả user đều thuộc về một phòng ban (VD: Học sinh, Phụ huynh)
+        related_name='staff_members', # Từ Department, có thể truy cập ds nhân viên: phong_ban.staff_members.all()
+        verbose_name="Phòng Ban Công tác (nếu có)"
+    )
 
     # Bạn có thể thêm các trường khác như 'status' nếu 'is_active' không đủ
     # status = models.CharField(max_length=50, blank=True, null=True)
@@ -74,28 +83,31 @@ class StudentProfile(models.Model):
         ('OTHER', 'Khác'),
     ]
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True, verbose_name="Giới tính")
-
-    # --- THÊM CÁC TRƯỜNG MỚI Ở ĐÂY ---
     current_class = models.ForeignKey(
-        'school_data.Class', # Sử dụng string 'app_name.ModelName'
-        on_delete=models.SET_NULL, # Nếu lớp bị xóa, thông tin lớp của HS này sẽ là NULL
+        'school_data.Class',
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='students', # Từ một Class, có thể truy cập danh sách HS: lop_hoc.students.all()
+        related_name='students',
         verbose_name="Lớp Hiện Tại"
     )
-
     parent = models.ForeignKey(
-        'ParentProfile', # ParentProfile cùng app nên có thể chỉ cần tên Model
-        on_delete=models.SET_NULL, # Nếu ParentProfile bị xóa, thông tin phụ huynh của HS này sẽ là NULL
+        'ParentProfile',
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='children', # Từ một ParentProfile, có thể truy cập ds con: phu_huynh.children.all()
+        related_name='children',
         verbose_name="Phụ Huynh Chính"
     )
-    # --- KẾT THÚC PHẦN THÊM MỚI ---
 
-    # student_id trong ERD có thể không cần thiết vì user.id hoặc user.pk đã là duy nhất
+    # --- THÊM TRƯỜNG MỚI Ở ĐÂY ---
+    enrolled_subjects = models.ManyToManyField(
+        'school_data.Subject',
+        blank=True, # Học sinh có thể (tạm thời) chưa đăng ký môn nào
+        related_name='enrolled_students', # Từ một Subject, có thể truy cập ds học sinh: mon_hoc.enrolled_students.all()
+        verbose_name="Các Môn học Đã đăng ký/Học"
+    )
+    # --- KẾT THÚC PHẦN THÊM MỚI ---
 
     def __str__(self):
         return f"Hồ sơ Học sinh: {self.user.username}"
