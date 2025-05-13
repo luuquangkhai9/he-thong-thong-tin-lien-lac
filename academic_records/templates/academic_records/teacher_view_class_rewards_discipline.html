@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}" role="alert" style="padding: 10px; margin-bottom: 15px; border: 1px solid transparent; border-radius: 4px; background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+{% if homeroom_classes|length > 1 %}
+    <form method="get" action="{% url 'academic_records:teacher_view_class_rewards_discipline' %}" class="mb-3 p-3 border rounded bg-light">
+        <label for="class_to_view_select" class="form-label">Chọn lớp chủ nhiệm:</label>
+        <select name="class_to_view" id="class_to_view_select" class="form-select form-control" onchange="this.form.submit()">
+            <option value="">--- Tất cả các lớp CN ---</option> {# Hoặc bỏ option này nếu luôn muốn chọn 1 lớp #}
+            {% for class_obj in homeroom_classes %}
+                <option value="{{ class_obj.pk }}" {% if active_class and active_class.pk == class_obj.pk %}selected{% endif %}>
+                    {{ class_obj.name }} ({{ class_obj.academic_year|default:"N/A" }})
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+    <hr>
+{% endif %}
+
+{% if active_class or not homeroom_classes|length > 1 and homeroom_classes.0 %} {# Hiển thị nếu có lớp active hoặc chỉ có 1 lớp CN #}
+    {% if not records_in_class %}
+        <p>Lớp {% if active_class %}{{ active_class.name }}{% else %}{{ homeroom_classes.0.name }}{% endif %} hiện chưa có mục khen thưởng/kỷ luật nào.</p>
+    {% else %}
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; margin-top:10px;">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Học sinh</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Ngày QĐ</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Loại</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Nội dung/Lý do</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Người QĐ</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records_in_class %}
+                    <tr {% if forloop.counter0|divisibleby:2 %}style="background-color: #f9f9f9;"{% endif %}>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ record.student.user.get_full_name|default:record.student.user.username }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ record.date_issued|date:"d/m/Y" }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; font-weight:bold; {% if record.record_type == 'REWARD' %}color:green;{% elif record.record_type == 'DISCIPLINE' %}color:red;{% endif %}">
+                            {{ record.get_record_type_display }}
+                        </td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ record.reason|truncatewords:15|linebreaksbr }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ record.issued_by.username|default:"-" }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">
+                            <a href="{% url 'academic_records:edit_reward_discipline' pk=record.pk %}">Sửa</a>
+                            {# Thêm link xóa nếu cần #}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+    <p><a href="{% url 'academic_records:add_reward_discipline' %}" class="btn btn-primary" style="background-color: #007bff; color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px;">Thêm Khen thưởng/Kỷ luật mới</a></p>
+{% elif homeroom_classes and not active_class %}
+    <p>Vui lòng chọn một lớp từ danh sách trên để xem.</p>
+{% endif %}
+
+{% endblock %}

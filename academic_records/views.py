@@ -3,16 +3,16 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Max
 from django.forms import modelformset_factory 
 from django.urls import reverse
 from collections import defaultdict
-import json
+import json 
 
-from .models import Score
+from .models import Score, RewardAndDiscipline, Evaluation
 from accounts.models import StudentProfile, ParentProfile, User, Role
-from school_data.models import Class as SchoolClass, Subject as SchoolSubject
-from .forms import ScoreContextForm, ScoreEntryForm
+from school_data.models import Class as SchoolClass, Subject as SchoolSubject, Department
+from .forms import ScoreContextForm, ScoreEntryForm, RewardAndDisciplineForm
 
 def convert_defaultdict_to_dict(d):
     if isinstance(d, defaultdict):
@@ -21,6 +21,7 @@ def convert_defaultdict_to_dict(d):
 
 @login_required
 def view_scores(request):
+    # ... (code view_scores không thay đổi) ...
     user = request.user
     context = {
         'page_title': 'Bảng điểm của bạn',
@@ -80,12 +81,13 @@ def view_scores(request):
 
 @login_required
 def enter_scores(request):
+    # ... (code enter_scores không thay đổi) ...
     teacher = request.user
     if not (hasattr(teacher, 'role') and teacher.role and teacher.role.name == 'TEACHER'):
         raise PermissionDenied("Chức năng này chỉ dành cho Giáo Viên.")
 
     score_context_form = ScoreContextForm(request.GET or None, teacher=teacher)
-    ScoreFormSet_default = modelformset_factory(Score, form=ScoreEntryForm, extra=0) # Default empty formset
+    ScoreFormSet_default = modelformset_factory(Score, form=ScoreEntryForm, extra=0)
     score_formset = ScoreFormSet_default(queryset=Score.objects.none()) 
     
     students_for_scoring = []
@@ -102,21 +104,19 @@ def enter_scores(request):
         post_selected_exam_date = request.POST.get('selected_exam_date_hidden')
         post_selected_academic_period = request.POST.get('selected_academic_period_hidden', "")
 
-        # Cập nhật lại score_context_form với các giá trị đã POST để hiển thị lại đúng
         score_context_form = ScoreContextForm(initial={
             'school_class': post_selected_class_id, 'subject': post_selected_subject_id,
             'exam_type': post_selected_exam_type, 'exam_date': post_selected_exam_date,
             'academic_period': post_selected_academic_period
         }, teacher=teacher)
 
-        # Lấy lại danh sách học sinh cho việc render lại formset nếu có lỗi
         if post_selected_class_id:
             target_class = get_object_or_404(SchoolClass, pk=post_selected_class_id)
             students_for_scoring = StudentProfile.objects.filter(current_class=target_class).select_related('user').order_by('user__last_name', 'user__first_name')
         
-        # Khởi tạo formset với dữ liệu POST
-        ScoreFormSet_post = modelformset_factory(Score, form=ScoreEntryForm, extra=len(students_for_scoring) if students_for_scoring else 0)
-        score_formset = ScoreFormSet_post(request.POST, queryset=Score.objects.none()) # queryset rỗng vì dùng update_or_create
+        num_forms_for_post = len(students_for_scoring) if students_for_scoring else 0
+        ScoreFormSet_post = modelformset_factory(Score, form=ScoreEntryForm, extra=num_forms_for_post, can_delete=False)
+        score_formset = ScoreFormSet_post(request.POST, queryset=Score.objects.none())
 
         if score_formset.is_valid():
             saved_count = 0
@@ -151,9 +151,6 @@ def enter_scores(request):
             return redirect(reverse('academic_records:enter_scores') + redirect_url_params)
         else:
             messages.error(request, "Vui lòng kiểm tra lại các lỗi trong bảng điểm.")
-            # students_for_scoring đã được lấy ở trên.
-            # score_formset (chứa lỗi) sẽ được truyền ra template.
-            # Cần đảm bảo template render đúng các form này.
 
     elif score_context_form.is_valid() and selected_class_id and selected_subject_id and selected_exam_type and selected_exam_date:
         target_class = get_object_or_404(SchoolClass, pk=selected_class_id)
@@ -179,12 +176,11 @@ def enter_scores(request):
             num_forms_to_create = len(initial_data_for_formset)
             ScoreFormSet_get = modelformset_factory(Score, form=ScoreEntryForm, extra=num_forms_to_create, can_delete=False)
             score_formset = ScoreFormSet_get(queryset=Score.objects.none(), initial=initial_data_for_formset)
-        # score_context_form đã được khởi tạo ở đầu với request.GET or None, và đã is_valid()
-
+        
     context = {
         'score_context_form': score_context_form,
         'score_formset': score_formset,
-        'students_for_scoring': students_for_scoring, # Quan trọng để template render tên học sinh
+        'students_for_scoring': students_for_scoring,
         'selected_class_id': selected_class_id,
         'selected_subject_id': selected_subject_id,
         'selected_exam_type': selected_exam_type,
@@ -196,7 +192,7 @@ def enter_scores(request):
 
 @login_required
 def teacher_view_class_scores(request):
-    # ... (code view teacher_view_class_scores giữ nguyên như bản đã dọn dẹp) ...
+    # ... (code teacher_view_class_scores không thay đổi) ...
     teacher = request.user
     if not (hasattr(teacher, 'role') and teacher.role and teacher.role.name == 'TEACHER'):
         raise PermissionDenied("Chức năng này chỉ dành cho Giáo viên.")
@@ -239,3 +235,177 @@ def teacher_view_class_scores(request):
         'students_in_class': students_in_class 
     }
     return render(request, 'academic_records/teacher_view_class_scores.html', context)
+
+@login_required
+def view_reward_discipline(request):
+    # ... (code view_reward_discipline không thay đổi) ...
+    user = request.user
+    context = {
+        'page_title': 'Khen thưởng và Kỷ luật',
+        'records_by_student': defaultdict(list), 
+        'is_parent': False,
+        'students_to_view': [], 
+        'error_message': None
+    }
+
+    user_role_name = None
+    if hasattr(user, 'role') and user.role:
+        user_role_name = user.role.name
+    
+    if user_role_name == 'STUDENT':
+        try:
+            student_profile = user.student_profile
+            context['students_to_view'] = [student_profile]
+            context['page_title'] = f'Khen thưởng/Kỷ luật của {student_profile.user.get_full_name() or student_profile.user.username}'
+        except StudentProfile.DoesNotExist:
+            context['error_message'] = "Không tìm thấy hồ sơ học sinh của bạn."
+
+    elif user_role_name == 'PARENT':
+        context['is_parent'] = True
+        try:
+            parent_profile = ParentProfile.objects.get(user=user)
+            children_profiles_qs = parent_profile.children.all().select_related('user')
+            
+            if not children_profiles_qs.exists():
+                context['error_message'] = "Bạn chưa có thông tin học sinh nào được liên kết."
+            else:
+                students_list = list(children_profiles_qs)
+                context['students_to_view'] = students_list
+                context['page_title'] = 'Khen thưởng/Kỷ luật của các con'
+        
+        except ParentProfile.DoesNotExist:
+            context['error_message'] = "Không tìm thấy hồ sơ phụ huynh của bạn."
+        except Exception as e:
+            context['error_message'] = "Đã có lỗi xảy ra khi truy xuất thông tin phụ huynh."
+    else:
+        context['error_message'] = "Chức năng này chỉ dành cho Học sinh và Phụ huynh."
+
+    if context['students_to_view']:
+        student_profile_pks = [sp.pk for sp in context['students_to_view']]
+        records_qs = RewardAndDiscipline.objects.filter(
+            student_id__in=student_profile_pks
+        ).select_related('student__user', 'issued_by').order_by('student__user__username', '-date_issued')
+        
+        for record in records_qs:
+            student_display_name = record.student.user.get_full_name() or record.student.user.username
+            context['records_by_student'][student_display_name].append(record)
+            
+    context['records_by_student'] = dict(context['records_by_student'])
+
+    return render(request, 'academic_records/view_reward_discipline.html', context)
+
+
+@login_required
+def manage_reward_discipline_record(request, pk=None):
+    user = request.user
+    allowed_roles = ['TEACHER', 'SCHOOL_ADMIN', 'ADMIN']
+    user_role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+
+    if not (user_role_name in allowed_roles and user.is_staff): # Điều kiện chung cho các vai trò được phép
+        # Nếu là TEACHER, cần kiểm tra thêm về lớp chủ nhiệm nếu không phải họ tạo
+        if user_role_name == 'TEACHER' and pk: # Khi edit, kiểm tra thêm
+            record_to_check = get_object_or_404(RewardAndDiscipline, pk=pk)
+            is_homeroom_teacher_of_student = record_to_check.student.current_class in SchoolClass.objects.filter(homeroom_teacher=user)
+            is_creator = record_to_check.issued_by == user
+            if not (is_homeroom_teacher_of_student or is_creator):
+                raise PermissionDenied("Giáo viên chỉ có thể sửa KT/KL của HS lớp mình CN hoặc do mình tạo.")
+        elif user_role_name != 'TEACHER' and not (user.is_staff and (user.department or user.is_superuser)): # Cho SCHOOL_ADMIN/ADMIN
+             raise PermissionDenied("Bạn không có quyền thực hiện hành động này.")
+        elif user_role_name != 'TEACHER' and not user.is_staff : # Trường hợp user có role SCHOOL_ADMIN/ADMIN nhưng is_staff=False
+             raise PermissionDenied("Bạn không có quyền thực hiện hành động này.")
+
+
+    instance = None
+    if pk:
+        instance = get_object_or_404(RewardAndDiscipline, pk=pk)
+        # Kiểm tra thêm quyền sửa cho GVCN (đã làm ở trên)
+        # Phòng Ban có thể sửa tất cả trong phạm vi của họ (nếu có logic gán phòng ban cho RewardAndDiscipline)
+
+    if request.method == 'POST':
+        form = RewardAndDisciplineForm(request.POST, instance=instance, requesting_user=user)
+        if form.is_valid():
+            new_record = form.save(commit=False)
+            if not new_record.pk: # Nếu là tạo mới
+                new_record.issued_by = user
+            new_record.save()
+            messages.success(request, f"Đã {'cập nhật' if pk else 'tạo mới'} mục khen thưởng/kỷ luật thành công.")
+            
+            # === THAY ĐỔI CHUYỂN HƯỚNG CHO PHÒNG BAN/ADMIN ===
+            if user_role_name == 'TEACHER':
+                return redirect('academic_records:teacher_view_class_rewards_discipline')
+            else: # SCHOOL_ADMIN, ADMIN (bao gồm cả nhanvien_bgh nếu có vai trò này)
+                return redirect('academic_records:school_wide_reward_discipline_list')
+            # === KẾT THÚC THAY ĐỔI ===
+    else:
+        form = RewardAndDisciplineForm(instance=instance, requesting_user=user)
+
+    context = {
+        'form': form,
+        'page_title': f"{'Chỉnh sửa' if pk else 'Tạo mới'} Khen thưởng/Kỷ luật",
+        'record_instance': instance
+    }
+    return render(request, 'academic_records/manage_reward_discipline_record.html', context)
+
+@login_required
+def teacher_view_class_rewards_discipline(request):
+    # ... (code teacher_view_class_rewards_discipline không thay đổi) ...
+    teacher = request.user
+    if not (hasattr(teacher, 'role') and teacher.role and teacher.role.name == 'TEACHER'):
+        raise PermissionDenied("Chức năng này chỉ dành cho Giáo viên.")
+
+    homeroom_classes = SchoolClass.objects.filter(homeroom_teacher=teacher)
+    
+    selected_class_pk_from_get = request.GET.get('class_to_view')
+    active_class = None
+    records_in_class = RewardAndDiscipline.objects.none()
+
+    if selected_class_pk_from_get:
+        active_class = get_object_or_404(SchoolClass, pk=selected_class_pk_from_get, homeroom_teacher=teacher)
+    elif homeroom_classes.exists():
+        active_class = homeroom_classes.first()
+
+    if active_class:
+        students_in_class_pks = StudentProfile.objects.filter(current_class=active_class).values_list('pk', flat=True)
+        records_in_class = RewardAndDiscipline.objects.filter(student_id__in=students_in_class_pks).select_related('student__user', 'issued_by').order_by('-date_issued')
+    else:
+        if homeroom_classes.exists():
+             messages.info(request, "Vui lòng chọn một lớp chủ nhiệm để xem.")
+        else:
+            messages.info(request, "Bạn hiện không chủ nhiệm lớp nào.")
+            
+    context = {
+        'page_title': f'Khen thưởng/Kỷ luật Lớp {active_class.name}' if active_class else 'Khen thưởng/Kỷ luật Lớp Chủ Nhiệm',
+        'active_class': active_class,
+        'homeroom_classes': homeroom_classes,
+        'records_in_class': records_in_class
+    }
+    return render(request, 'academic_records/teacher_view_class_rewards_discipline.html', context)
+
+@login_required
+def school_wide_reward_discipline_list(request):
+    # ... (code school_wide_reward_discipline_list không thay đổi) ...
+    user = request.user
+    allowed_roles_for_school_wide_view = ['SCHOOL_ADMIN', 'ADMIN'] 
+    
+    can_view = False
+    user_role_name = getattr(user.role, 'name', None) if hasattr(user, 'role') else None
+
+    if user_role_name in allowed_roles_for_school_wide_view:
+        can_view = True
+    elif user.is_staff and hasattr(user, 'department') and user.department:
+        can_view = True
+        
+    if not can_view:
+        raise PermissionDenied("Bạn không có quyền truy cập trang này.")
+
+    all_records_qs = RewardAndDiscipline.objects.all().select_related(
+        'student__user', 
+        'student__current_class', 
+        'issued_by'
+    ).order_by('-date_issued', 'student__user__last_name')
+
+    context = {
+        'all_records': all_records_qs,
+        'page_title': 'Tổng hợp Khen thưởng/Kỷ luật Toàn trường',
+    }
+    return render(request, 'academic_records/school_wide_reward_discipline_list.html', context)

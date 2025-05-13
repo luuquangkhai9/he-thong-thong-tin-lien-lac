@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    {{ form.non_field_errors }}
+
+    {% for field in form %}
+        <div style="margin-bottom: 15px;">
+            <label for="{{ field.id_for_label }}">{{ field.label }}:</label><br>
+            {{ field }}
+            {% if field.help_text %}
+                <small style="color: grey; display: block;">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+                <p style="color: red; font-size: 0.9em;">{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endfor %}
+    
+    <button type="submit" style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+        {% if record_instance %}Lưu Thay đổi{% else %}Tạo Mới{% endif %}
+    </button>
+    <a href="{% if request.user.role.name == 'TEACHER' %}{% url 'academic_records:teacher_view_class_rewards_discipline' %}{% else %}{% url 'admin:academic_records_rewardanddiscipline_changelist' %}{% endif %}" 
+       style="margin-left: 10px; color: #6c757d; text-decoration: none;">Hủy</a>
+</form>
+
+{% endblock %}

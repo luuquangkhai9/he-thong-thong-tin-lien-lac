@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}" role="alert" style="padding: 10px; margin-bottom: 15px; border: 1px solid transparent; border-radius: 4px; background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+{# TODO: Thêm Form bộ lọc ở đây nếu có #}
+{# <form method="get" class="mb-3 p-3 border rounded bg-light"> #}
+{#    ... các trường filter ... #}
+{#    <button type="submit">Lọc</button> #}
+{# </form> #}
+
+
+{% if all_records %}
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; margin-top:10px;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Học sinh</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Lớp</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Ngày QĐ</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Loại</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Nội dung/Lý do</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Người QĐ</th>
+                {# <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Hành động</th> #}
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in all_records %}
+                <tr {% if forloop.counter0|divisibleby:2 %}style="background-color: #f9f9f9;"{% endif %}>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ record.student.user.get_full_name|default:record.student.user.username }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ record.student.current_class.name|default:"N/A" }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ record.date_issued|date:"d/m/Y" }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; font-weight:bold; {% if record.record_type == 'REWARD' %}color:green;{% elif record.record_type == 'DISCIPLINE' %}color:red;{% endif %}">
+                        {{ record.get_record_type_display }}
+                    </td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ record.reason|truncatewords:20|linebreaksbr }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{{ record.issued_by.username|default:"-" }}</td>
+                    {# <td> #}
+                    {#    <a href="{% url 'admin:academic_records_rewardanddiscipline_change' record.pk %}">Sửa (Admin)</a> #}
+                    {# </td> #}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {# TODO: Thêm phân trang nếu cần #}
+{% else %}
+    <p>Chưa có mục khen thưởng/kỷ luật nào trong toàn trường.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+{% if error_message %}
+    <p style="color: red;">Lỗi: {{ error_message }}</p>
+{% endif %}
+
+{% if not records_by_student and not error_message and not students_to_view %} 
+    <p>Hiện chưa có thông tin khen thưởng/kỷ luật nào.</p> 
+{% endif %}
+
+{% for student_name, records_list in records_by_student.items %}
+    {% if students_to_view|length > 1 or is_parent %}
+        <h3 style="margin-top: 30px; border-bottom: 2px solid #007bff; padding-bottom: 5px; color: #0056b3;">
+            Học sinh: {{ student_name }}
+        </h3>
+    {% endif %}
+
+    {% if not records_list %}
+        <p>Chưa có mục khen thưởng/kỷ luật nào cho học sinh {{ student_name }}.</p>
+    {% else %}
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; margin-top:10px;">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Ngày Quyết định</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Loại</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Nội dung/Lý do</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Người Quyết định</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records_list %}
+                    <tr {% if forloop.counter0|divisibleby:2 %}style="background-color: #f9f9f9;"{% endif %}>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ record.date_issued|date:"d/m/Y" }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; font-weight:bold; {% if record.record_type == 'REWARD' %}color:green;{% elif record.record_type == 'DISCIPLINE' %}color:red;{% endif %}">
+                            {{ record.get_record_type_display }}
+                        </td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ record.reason|linebreaksbr }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ record.issued_by.username|default:"Không rõ" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+    <hr style="border-top: 1px solid #ccc; margin-top:20px;">
+{% empty %} 
+    {% if not error_message %}
+        {% if not students_to_view %}
+            <p>Không có thông tin học sinh để hiển thị.</p>
+        {% elif students_to_view and not records_by_student %} 
+            <p>Hiện chưa có thông tin khen thưởng/kỷ luật nào cho các học sinh được chỉ định.</p>
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% endblock %}
