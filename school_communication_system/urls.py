@@ -13,4 +13,7 @@ urlpatterns = [
 
     # Trang chủ sẽ trỏ trực tiếp đến view notification_list
     path('', comm_views.notification_list, name='homepage'), # Đặt tên URL là 'homepage'
+
+    path('academics/', include('academic_records.urls')), # <<--- THÊM DÒNG NÀY ---
+
 ]

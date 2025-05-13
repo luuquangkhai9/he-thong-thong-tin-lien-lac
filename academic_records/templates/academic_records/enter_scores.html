@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}" role="alert"
+             style="padding: 10px; margin-bottom: 15px; border: 1px solid transparent; border-radius: 4px;
+                    {% if message.tags == 'success' %}background-color: #d4edda; border-color: #c3e6cb; color: #155724;
+                    {% elif message.tags == 'error' %}background-color: #f8d7da; border-color: #f5c6cb; color: #721c24;
+                    {% elif message.tags == 'info' %}background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;
+                    {% else %}background-color: #e2e3e5; border-color: #d6d8db; color: #383d41;{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+{# --- Form chọn Context --- #}
+<form method="get" action="{% url 'academic_records:enter_scores' %}" class="mb-4 p-3 border rounded bg-light">
+    <h4>Chọn thông tin để nhập điểm:</h4>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+        <div>
+            <label for="{{ score_context_form.school_class.id_for_label }}">{{ score_context_form.school_class.label }}</label>
+            {{ score_context_form.school_class }}
+        </div>
+        <div>
+            <label for="{{ score_context_form.subject.id_for_label }}">{{ score_context_form.subject.label }}</label>
+            {{ score_context_form.subject }}
+        </div>
+        <div>
+            <label for="{{ score_context_form.exam_type.id_for_label }}">{{ score_context_form.exam_type.label }}</label>
+            {{ score_context_form.exam_type }}
+        </div>
+        <div>
+            <label for="{{ score_context_form.exam_date.id_for_label }}">{{ score_context_form.exam_date.label }}</label>
+            {{ score_context_form.exam_date }}
+        </div>
+        <div>
+            <label for="{{ score_context_form.academic_period.id_for_label }}">{{ score_context_form.academic_period.label }}</label>
+            {{ score_context_form.academic_period }}
+            {% if score_context_form.academic_period.help_text %}<small class="form-text text-muted">{{ score_context_form.academic_period.help_text }}</small>{% endif %}
+        </div>
+    </div>
+    <button type="submit" name="load_students" class="btn btn-primary" style="background-color: #007bff; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer;">
+        Hiển thị Danh sách Học sinh
+    </button>
+</form>
+
+{# --- Formset Nhập Điểm --- #}
+{% if students_for_scoring and score_formset %}
+    <hr>
+    <h4>Nhập điểm cho Lớp: 
+        {% for class_obj in score_context_form.school_class.field.queryset %}
+            {% if class_obj.pk|stringformat:"s" == selected_class_id %} {{ class_obj.name }} {% endif %}
+        {% endfor %}
+        - Môn: 
+        {% for subject_obj in score_context_form.subject.field.queryset %}
+            {% if subject_obj.pk|stringformat:"s" == selected_subject_id %} {{ subject_obj.name }} {% endif %}
+        {% endfor %}
+    </h4>
+    <p>Loại kỳ thi: 
+        {% for value, display_name in score_context_form.exam_type.field.choices %}
+            {% if value == selected_exam_type %} {{ display_name }} {% endif %}
+        {% empty %} {{ selected_exam_type|default:"Chưa chọn" }}
+        {% endfor %}
+        - Ngày: {{ selected_exam_date|default:"Chưa chọn" }} 
+        {% if selected_academic_period %}- Kỳ học: {{ selected_academic_period }}{% endif %}
+    </p>
+
+    <p style="background-color: #ffc; padding: 5px; border: 1px solid #dda;">
+        <strong>DEBUG TEMPLATE - Score Formset Info:</strong><br>
+        Is score_formset defined? {% if score_formset %}YES{% else %}NO (or None){% endif %}<br>
+        Number of forms in score_formset (score_formset|length): {{ score_formset|length }} <br>
+        Number of forms via .forms (score_formset.forms|length): {{ score_formset.forms|length }} <br>
+        Management form: {{ score_formset.management_form }}
+    </p>
+
+
+    <form method="post" action="{% url 'academic_records:enter_scores' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+        {% csrf_token %}
+        {{ score_formset.management_form }}
+
+        <input type="hidden" name="selected_class_id_hidden" value="{{ selected_class_id }}">
+        <input type="hidden" name="selected_subject_id_hidden" value="{{ selected_subject_id }}">
+        <input type="hidden" name="selected_exam_type_hidden" value="{{ selected_exam_type }}">
+        <input type="hidden" name="selected_exam_date_hidden" value="{{ selected_exam_date }}">
+        <input type="hidden" name="selected_academic_period_hidden" value="{{ selected_academic_period }}">
+
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">STT</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Học sinh</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Điểm số</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Ghi chú</th>
+                </tr>
+            </thead>
+            <tbody>
+                {# === SỬA VÒNG LẶP Ở ĐÂY: Lặp qua score_formset.forms === #}
+                {% for form in score_formset.forms %} 
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px;">{{ forloop.counter }}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">
+                            {{ form.student_name }} {# Sẽ render widget của trường student_name #}
+                            {{ form.student_id }}   {# Sẽ render widget ẩn của trường student_id #}
+                            {% if form.student_name.errors %}<div class="text-danger_"><small>{{ form.student_name.errors|join:", " }}</small></div>{% endif %}
+                        </td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">
+                            {{ form.score_value }}
+                            {% if form.score_value.errors %}<div class="text-danger_"><small>{{ form.score_value.errors|join:", " }}</small></div>{% endif %}
+                        </td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">
+                            {{ form.notes }}
+                            {% if form.notes.errors %}<div class="text-danger_"><small>{{ form.notes.errors|join:", " }}</small></div>{% endif %}
+                        </td>
+                    </tr>
+                {% empty %} 
+                     <tr>
+                        <td colspan="4" style="text-align: center; padding: 10px;">DEBUG: Vòng lặp {% verbatim %}{% for form in score_formset.forms %}{% endverbatim %} không có item nào.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" name="save_scores" class="btn btn-success" style="background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+            Lưu Bảng Điểm
+        </button>
+    </form>
+{% elif request.GET.load_students %} 
+    <p style="color: orange; margin-top: 15px;">Không tìm thấy học sinh nào cho lựa chọn của bạn, hoặc lớp chưa có học sinh (students_for_scoring rỗng).</p>
+{% endif %}
+
+{% endblock %}
