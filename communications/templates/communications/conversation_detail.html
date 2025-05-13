@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .message-list-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 300px); /* Điều chỉnh chiều cao tùy theo header/footer/form */
+        min-height: 300px; /* Chiều cao tối thiểu */
+    }
+    .message-list {
+        list-style-type: none;
+        padding: 10px;
+        margin-bottom: 0; /* Bỏ margin bottom */
+        flex-grow: 1; /* Cho phép danh sách tin nhắn co giãn */
+        overflow-y: auto; /* Thêm thanh cuộn khi nội dung dài */
+        border: 1px solid #eee;
+        border-radius: 5px;
+        background-color: #fff; /* Nền cho khu vực tin nhắn */
+    }
+    .message-item {
+        margin-bottom: 15px;
+        padding: 8px 12px; /* Giảm padding một chút */
+        border-radius: 15px; /* Bo tròn nhiều hơn */
+        max-width: 75%; /* Giới hạn chiều rộng tin nhắn */
+        word-wrap: break-word;
+        clear: both; /* Đảm bảo không bị float chồng chéo */
+    }
+    .message-item.sent {
+        background-color: #dcf8c6; /* Màu xanh lá cho tin nhắn gửi đi */
+        float: right; /* Căn phải */
+        border-bottom-right-radius: 0; /* Góc vuông cho tin nhắn gửi */
+    }
+    .message-item.received {
+        background-color: #f1f0f0; /* Màu xám cho tin nhắn nhận được */
+        float: left; /* Căn trái */
+        border-bottom-left-radius: 0; /* Góc vuông cho tin nhắn nhận */
+    }
+    .message-item::after { /* Clearfix cho float */
+        content: "";
+        display: table;
+        clear: both;
+    }
+    .message-sender {
+        font-weight: bold;
+        font-size: 0.85em; /* Giảm kích thước font */
+        color: #555;
+        margin-bottom: 2px; /* Giảm margin */
+    }
+    .message-content {
+        font-size: 0.95em; /* Giảm kích thước font */
+    }
+    .message-time {
+        font-size: 0.7em; /* Giảm kích thước font */
+        color: #777;
+        text-align: right;
+        margin-top: 3px; /* Giảm margin */
+    }
+    .message-form-container {
+        padding: 15px;
+        background-color: #f9f9f9;
+        border-top: 1px solid #ddd;
+        border-radius: 0 0 5px 5px; /* Bo góc dưới nếu message-list-container có bo góc */
+    }
+    .message-form textarea {
+        width: calc(100% - 22px); /* Điều chỉnh để vừa với padding */
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 15px; /* Bo tròn ô nhập liệu */
+        margin-bottom: 10px;
+        resize: vertical;
+        min-height: 40px; /* Chiều cao tối thiểu */
+        font-size: 0.95em;
+    }
+    .message-form button {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 15px; /* Bo tròn nút */
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .message-form button:hover {
+        background-color: #0056b3;
+    }
+    .back-link-container {
+        margin-top: 20px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+<div class="message-list-container">
+    <ul class="message-list" id="message-list-ul">
+        {% for msg in messages_in_conversation %}
+            <li class="message-item {% if msg.sender == request.user %}sent{% else %}received{% endif %}">
+                {% if msg.sender != request.user and conversation.conversation_type == 'GROUP' %} {# Chỉ hiển thị tên người gửi nếu là group chat và không phải mình #}
+                    <div class="message-sender">{{ msg.sender.get_full_name|default:msg.sender.username }}</div>
+                {% endif %}
+                <div class="message-content">{{ msg.content|linebreaksbr }}</div>
+                <div class="message-time">{{ msg.sent_at|date:"H:i, d/m/Y" }}</div>
+            </li>
+        {% empty %}
+            <li style="text-align: center; color: #777; padding: 20px;">Chưa có tin nhắn nào trong cuộc hội thoại này. Bắt đầu trò chuyện!</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="message-form-container">
+    <form method="post" class="message-form">
+        {% csrf_token %}
+        {{ message_form.content.errors }}
+        {{ message_form.content }}  {# Chỉ render trường content #}
+        <button type="submit">Gửi</button>
+    </form> 
+</div>
+
+<div class="back-link-container">
+    <a href="{% url 'communications:conversation_list' %}" class="btn btn-secondary" style="text-decoration: none; padding: 8px 12px; background-color: #6c757d; color:white; border-radius:5px;">Quay lại danh sách hội thoại</a>
+</div>
+
+<script>
+    // Tự động cuộn xuống tin nhắn mới nhất khi tải trang
+    const messageList = document.getElementById('message-list-ul');
+    if (messageList) {
+        messageList.scrollTop = messageList.scrollHeight;
+    }
+</script>
+{% endblock %}

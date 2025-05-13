@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h2>{{ page_title }}</h2>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}" role="alert"
+             style="padding: 10px; margin-bottom: 15px; border: 1px solid transparent; border-radius: 4px;
+                    {% if message.tags == 'success' %}background-color: #d4edda; border-color: #c3e6cb; color: #155724;
+                    {% elif message.tags == 'error' %}background-color: #f8d7da; border-color: #f5c6cb; color: #721c24;
+                    {% elif message.tags == 'info' %}background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;
+                    {% else %}background-color: #e2e3e5; border-color: #d6d8db; color: #383d41;{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    {{ form.non_field_errors }} {# Hiển thị lỗi chung của form (nếu có) #}
+
+    <div style="margin-bottom: 15px;">
+        <label for="{{ form.recipient.id_for_label }}">{{ form.recipient.label }}:</label><br>
+        {{ form.recipient }}
+        {% if form.recipient.help_text %}
+            <small style="color: grey; display: block;">{{ form.recipient.help_text }}</small>
+        {% endif %}
+        {% for error in form.recipient.errors %}
+            <p style="color: red; font-size: 0.9em;">{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <div style="margin-bottom: 15px;">
+        <label for="{{ form.initial_message.id_for_label }}">{{ form.initial_message.label }}:</label><br>
+        {{ form.initial_message }}
+        {% if form.initial_message.help_text %}
+            <small style="color: grey; display: block;">{{ form.initial_message.help_text }}</small>
+        {% endif %}
+        {% for error in form.initial_message.errors %}
+            <p style="color: red; font-size: 0.9em;">{{ error }}</p>
+        {% endfor %}
+    </div>
+    
+    <button type="submit" style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Bắt đầu Trò chuyện</button>
+    <a href="{% url 'communications:conversation_list' %}" style="margin-left: 10px; color: #6c757d; text-decoration: none;">Hủy</a>
+</form>
+
+{% endblock %}

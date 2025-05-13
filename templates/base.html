@@ -34,6 +34,9 @@
                 <a href="{% url 'academic_records:teacher_view_class_scores' %}">Điểm Lớp CN</a> {# <<--- LINK MỚI --- #}
             {% endif %}
             {# --- KẾT THÚC LINK MỚI --- #}
+            {# --- LINK MỚI CHO TIN NHẮN --- #}
+            <a href="{% url 'communications:conversation_list' %}">Tin nhắn</a>
+            {# --- KẾT THÚC LINK MỚI --- #}
             {# --- LINK MỚI CHO XEM ĐIỂM --- #}
             {% if user.role.name == 'STUDENT' or user.role.name == 'PARENT' %}
                 <a href="{% url 'academic_records:view_scores' %}">Xem Điểm</a>

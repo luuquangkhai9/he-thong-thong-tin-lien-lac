@@ -1,0 +1,100 @@
+  {% extends "base.html" %}
+
+  {% block title %}{{ page_title }}{% endblock %}
+
+  {% block extra_head %}
+  <style>
+      .conversation-list { list-style-type: none; padding: 0; }
+      .conversation-item { 
+          display: flex; 
+          align-items: center; 
+          padding: 15px; 
+          border-bottom: 1px solid #eee; 
+          text-decoration: none; 
+          color: inherit;
+      }
+      .conversation-item:hover { background-color: #f9f9f9; }
+      .conversation-avatar { /* Placeholder cho avatar */
+          width: 50px; height: 50px; 
+          background-color: #007bff; color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+          margin-right: 15px;
+          text-transform: uppercase;
+      }
+      .conversation-details { flex-grow: 1; }
+      .conversation-title { font-weight: bold; margin-bottom: 5px; font-size: 1.1em; }
+      .conversation-snippet { color: #555; font-size: 0.9em; margin-bottom: 5px; }
+      .conversation-time { font-size: 0.8em; color: #777; text-align: right; min-width: 120px;}
+      .no-conversations { text-align: center; padding: 20px; color: #777; }
+      .new-conversation-link { display: block; text-align: right; margin-bottom: 20px; }
+  </style>
+  {% endblock %}
+
+  {% block content %}
+  <h2>{{ page_title }}</h2>
+
+  <div class="new-conversation-link">
+      {# --- BỎ COMMENT VÀ SỬA LINK NÀY --- #}
+      <a href="{% url 'communications:start_new_conversation' %}" class="btn btn-primary" style="background-color: #007bff; color: white; padding: 8px 12px; text-decoration: none; border-radius: 5px;">Tin nhắn mới</a>
+      {# --- KẾT THÚC --- #}
+  </div>
+
+  {% if conversations %}
+      <ul class="conversation-list">
+          {% for convo in conversations %}
+              <a href="{% url 'communications:conversation_detail' conversation_id=convo.pk %}" class="conversation-item">
+                  <div class="conversation-avatar">
+                      {% if convo.conversation_type == 'DIRECT' %}
+                          {% for participant in convo.participants.all %}
+                              {% if participant != request.user %}
+                                  {{ participant.username|slice:":2" }}
+                              {% endif %}
+                          {% endfor %}
+                      {% else %}
+                          {{ convo.title|slice:":2"|default:"Gr" }}
+                      {% endif %}
+                  </div>
+                  <div class="conversation-details">
+                      <div class="conversation-title">
+                          {% if convo.conversation_type == 'DIRECT' %}
+                              {% for participant in convo.participants.all %}
+                                  {% if participant != request.user %}
+                                      {{ participant.get_full_name|default:participant.username }}
+                                  {% endif %}
+                              {% endfor %}
+                          {% else %}
+                              {{ convo.title|default:"Cuộc hội thoại nhóm" }}
+                          {% endif %}
+                      </div>
+                      <div class="conversation-snippet">
+                          {% with last_message=convo.messages.all.last %}
+                              {% if last_message %}
+                                  <strong>{{ last_message.sender.username }}:</strong> 
+                                  {{ last_message.content|truncatewords:8 }}
+                              {% else %}
+                                  Chưa có tin nhắn.
+                              {% endif %}
+                          {% endwith %}
+                      </div>
+                  </div>
+                  <div class="conversation-time">
+                       {% with last_message_time_attr=convo.last_message_time %}
+                          {% if last_message_time_attr %}
+                              {{ last_message_time_attr|timesince }} trước
+                          {% else %}
+                              {{ convo.updated_at|timesince }} trước
+                          {% endif %}
+                       {% endwith %}
+                  </div>
+              </a>
+          {% endfor %}
+      </ul>
+  {% else %}
+      <p class="no-conversations">Bạn chưa có cuộc hội thoại nào.</p>
+  {% endif %}
+  {% endblock %}
+  

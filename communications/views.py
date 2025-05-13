@@ -203,3 +203,136 @@ def teacher_request_detail_respond(request, pk):
         'page_title': f'Chi tiết và Phản hồi Đơn (GV): {request_form_instance.title}'
     }
     return render(request, 'communications/teacher_request_detail_respond.html', context)
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
+from django.utils import timezone
+from django.db.models import Q, Max
+
+from .models import Notification, RequestForm, Conversation, Message
+from .forms import RequestFormSubmissionForm, RequestFormResponseForm, MessageForm # Thêm MessageForm
+
+# ... (các views khác đã có) ...
+
+@login_required
+def conversation_list(request):
+    user = request.user
+    user_conversations = Conversation.objects.filter(participants=user).annotate(
+        last_message_time=Max('messages__sent_at')
+    ).order_by('-last_message_time', '-updated_at')
+
+    context = {
+        'conversations': user_conversations,
+        'page_title': 'Hộp thư của bạn',
+    }
+    return render(request, 'communications/conversation_list.html', context)
+
+@login_required
+def conversation_detail(request, conversation_id):
+    user = request.user
+    # Đảm bảo người dùng là thành viên của cuộc hội thoại này
+    conversation = get_object_or_404(Conversation, pk=conversation_id, participants=user)
+    
+    messages_in_conversation = conversation.messages.all().order_by('sent_at')
+
+    if request.method == 'POST':
+        message_form = MessageForm(request.POST)
+        if message_form.is_valid():
+            new_message = message_form.save(commit=False)
+            new_message.conversation = conversation
+            new_message.sender = user
+            new_message.save()
+
+            # Cập nhật trường updated_at của cuộc hội thoại
+            conversation.updated_at = timezone.now() # Hoặc new_message.sent_at
+            conversation.save(update_fields=['updated_at'])
+            
+            # messages.success(request, "Đã gửi tin nhắn!") # Có thể không cần thông báo flash cho mỗi tin nhắn
+            return redirect('communications:conversation_detail', conversation_id=conversation.pk)
+        # else:
+            # Nếu form không hợp lệ, lỗi sẽ được hiển thị cùng với form
+            # messages.error(request, "Không thể gửi tin nhắn. Vui lòng thử lại.")
+    else:
+        message_form = MessageForm() # Form trống cho GET request
+
+    context = {
+        'conversation': conversation,
+        'messages_in_conversation': messages_in_conversation,
+        'message_form': message_form, # Truyền form vào context
+        'page_title': f"{conversation.title or ', '.join([p.username for p in conversation.participants.all() if p != user])}",
+    }
+    return render(request, 'communications/conversation_detail.html', context)
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
+from django.utils import timezone
+from django.db.models import Q, Max, Count # Thêm Count
+
+from .models import Notification, RequestForm, Conversation, Message
+# Đảm bảo StartConversationForm được import từ forms.py của app communications
+from .forms import RequestFormSubmissionForm, RequestFormResponseForm, MessageForm, StartConversationForm 
+# from accounts.models import User, Role # User đã được import qua settings.AUTH_USER_MODEL nếu cần
+
+# ... (các views notification_list, submit_request_form, my_submitted_requests,
+# department_request_list, department_request_detail_respond,
+# teacher_request_list, teacher_request_detail_respond,
+# conversation_list, conversation_detail đã có ở trên) ...
+
+@login_required
+def start_new_conversation(request):
+    if request.method == 'POST':
+        form = StartConversationForm(request.POST, requesting_user=request.user)
+        if form.is_valid():
+            recipient = form.cleaned_data['recipient']
+            initial_message_content = form.cleaned_data.get('initial_message')
+            
+            # Kiểm tra xem đã có cuộc hội thoại 1-1 nào giữa hai người này chưa
+            # Một cuộc hội thoại 1-1 sẽ có đúng 2 người tham gia
+            # và cả người gửi lẫn người nhận đều nằm trong danh sách participants
+            
+            # Tìm các cuộc hội thoại có cả 2 người tham gia và là DIRECT type
+            # và có đúng 2 người tham gia
+            existing_conversation = Conversation.objects.annotate(
+                num_participants=Count('participants')
+            ).filter(
+                conversation_type='DIRECT',
+                participants=request.user
+            ).filter(
+                participants=recipient
+            ).filter(
+                num_participants=2 # Đảm bảo chỉ có đúng 2 người này
+            ).first()
+
+            if existing_conversation:
+                conversation = existing_conversation
+                messages.info(request, f"Bạn đã có cuộc hội thoại với {recipient.username}. Đang chuyển hướng...")
+            else:
+                # Tạo cuộc hội thoại mới
+                conversation = Conversation.objects.create(conversation_type='DIRECT')
+                conversation.participants.add(request.user, recipient)
+                # Không cần đặt title cho DIRECT conversation
+                # conversation.save() # .add() đã lưu rồi
+
+            # Nếu có tin nhắn đầu tiên, tạo tin nhắn đó
+            if initial_message_content:
+                Message.objects.create(
+                    conversation=conversation,
+                    sender=request.user,
+                    content=initial_message_content
+                )
+                # Cập nhật updated_at cho conversation
+                conversation.updated_at = timezone.now()
+                conversation.save(update_fields=['updated_at'])
+            
+            return redirect('communications:conversation_detail', conversation_id=conversation.pk)
+    else:
+        form = StartConversationForm(requesting_user=request.user)
+
+    context = {
+        'form': form,
+        'page_title': 'Bắt đầu Cuộc hội thoại mới',
+    }
+    return render(request, 'communications/start_new_conversation.html', context)

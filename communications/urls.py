@@ -14,5 +14,12 @@ urlpatterns = [
     path('teacher-requests/', views.teacher_request_list, name='teacher_request_list'),
     path('teacher-requests/<int:pk>/respond/', views.teacher_request_detail_respond, name='teacher_respond_request'),
     # --- KẾT THÚC URLs MỚI ---
+    # --- URLs MỚI CHO NHẮN TIN ---
+    path('messages/', views.conversation_list, name='conversation_list'),
+    path('messages/<int:conversation_id>/', views.conversation_detail, name='conversation_detail'), # Sẽ thêm sau
+    # --- KẾT THÚC URLs MỚI ---    
+        # --- URL MỚI ĐỂ BẮT ĐẦU CUỘC HỘI THOẠI ---
+    path('messages/new/', views.start_new_conversation, name='start_new_conversation'),
+    # --- KẾT THÚC URL MỚI ---
 
 ]
