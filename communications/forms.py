@@ -236,3 +236,92 @@ class StartConversationForm(forms.Form):
 
         # Tùy chỉnh hiển thị cho ModelChoiceField (hiển thị username hoặc full_name)
         self.fields['recipient'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
+
+
+from django import forms
+from .models import Notification, Message, Conversation, RequestForm # Đảm bảo Notification đã import
+from accounts.models import User, Role, StudentProfile # Import Role
+from school_data.models import Department, Class as SchoolClass # Import Class
+
+# ... (các form khác đã có) ...
+
+class NotificationForm(forms.ModelForm):
+    # Trường lựa chọn nhóm đối tượng chung
+    RECIPIENT_GROUP_CHOICES = [
+        ('', '--- Chọn nhóm chung (tùy chọn) ---'),
+        ('ALL_TEACHERS', 'Tất cả Giáo viên'),
+        ('ALL_PARENTS', 'Tất cả Phụ huynh'),
+        ('ALL_STUDENTS', 'Tất cả Học sinh'),
+        # ('EVERYONE', 'Tất cả mọi người trong trường'), # Cân nhắc kỹ logic cho lựa chọn này
+    ]
+    recipient_group = forms.ChoiceField(
+        choices=RECIPIENT_GROUP_CHOICES,
+        required=False,
+        label="Gửi đến nhóm chung",
+        widget=forms.Select(attrs={'class': 'form-control mb-2'})
+    )
+
+    # Trường chọn nhiều vai trò cụ thể (ngoài các nhóm chung ở trên)
+    target_roles = forms.ModelMultipleChoiceField(
+        queryset=Role.objects.all().order_by('name'),
+        widget=forms.CheckboxSelectMultiple, # Hoặc SelectMultiple(attrs={'class': 'form-control select2-multiple', 'size':'3'})
+        required=False,
+        label="Hoặc/Và chọn các Vai trò cụ thể",
+        help_text="Giữ Ctrl (hoặc Command trên Mac) để chọn nhiều."
+    )
+
+    # Trường chọn nhiều lớp học cụ thể
+    target_classes = forms.ModelMultipleChoiceField(
+        queryset=SchoolClass.objects.all().order_by('name'),
+        widget=forms.CheckboxSelectMultiple, # Hoặc SelectMultiple
+        required=False,
+        label="Hoặc/Và chọn các Lớp học cụ thể",
+        help_text="Giữ Ctrl (hoặc Command trên Mac) để chọn nhiều."
+    )
+    
+    # Trường chọn nhiều người dùng cụ thể
+    target_users = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(is_active=True).order_by('username'),
+        widget=forms.SelectMultiple(attrs={'class': 'form-control select2-multiple-users', 'size':'5'}), # Cần JS cho select2
+        required=False,
+        label="Hoặc/Và chọn Người dùng cụ thể",
+        help_text="Giữ Ctrl (hoặc Command trên Mac) để chọn nhiều. Bạn có thể tìm kiếm nếu dùng widget nâng cao."
+    )
+
+    class Meta:
+        model = Notification
+        fields = ['title', 'content', 'recipient_group', 'target_roles', 'target_classes', 'target_users']
+        # Các trường 'sent_by', 'status', 'publish_time', 'is_published' sẽ được xử lý trong view.
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nhập tiêu đề thông báo...'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 7, 'placeholder': 'Nhập nội dung thông báo...'}),
+        }
+        labels = {
+            'title': 'Tiêu đề Thông báo',
+            'content': 'Nội dung chi tiết',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Tùy chỉnh label_from_instance cho các trường ModelMultipleChoiceField nếu cần
+        self.fields['target_roles'].label_from_instance = lambda obj: obj.get_name_display()
+        self.fields['target_classes'].label_from_instance = lambda obj: f"{obj.name} ({obj.academic_year or 'N/A'})"
+        self.fields['target_users'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
+        
+        # Gợi ý: Để widget SelectMultiple cho target_users thân thiện hơn khi có nhiều user,
+        # bạn có thể dùng các thư viện như django-select2 hoặc tự viết widget với tìm kiếm.
+        # Hiện tại, nó sẽ là một danh sách dài.
+
+    def clean(self):
+        cleaned_data = super().clean()
+        recipient_group = cleaned_data.get('recipient_group')
+        target_roles = cleaned_data.get('target_roles')
+        target_classes = cleaned_data.get('target_classes')
+        target_users = cleaned_data.get('target_users')
+
+        if not recipient_group and not target_roles and not target_classes and not target_users:
+            raise forms.ValidationError(
+                "Bạn phải chọn ít nhất một hình thức gửi đến (Nhóm chung, Vai trò, Lớp, hoặc Người dùng cụ thể).",
+                code='no_recipient_selected'
+            )
+        return cleaned_data

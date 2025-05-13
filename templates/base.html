@@ -37,6 +37,11 @@
             {# --- LINK MỚI CHO TIN NHẮN --- #}
             <a href="{% url 'communications:conversation_list' %}">Tin nhắn</a>
             {# --- KẾT THÚC LINK MỚI --- #}
+            {# --- LINK MỚI ĐỂ TẠO THÔNG BÁO --- #}
+            {% if user.role.name == 'TEACHER' or user.role.name == 'SCHOOL_ADMIN' or user.role.name == 'ADMIN' %}
+                <a href="{% url 'communications:create_notification' %}">Tạo Thông báo</a>
+            {% endif %}
+            {# --- KẾT THÚC LINK MỚI --- #}
             {# --- LINK MỚI CHO XEM ĐIỂM --- #}
             {% if user.role.name == 'STUDENT' or user.role.name == 'PARENT' %}
                 <a href="{% url 'academic_records:view_scores' %}">Xem Điểm</a>

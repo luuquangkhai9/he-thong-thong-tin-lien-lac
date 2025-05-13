@@ -21,5 +21,8 @@ urlpatterns = [
         # --- URL MỚI ĐỂ BẮT ĐẦU CUỘC HỘI THOẠI ---
     path('messages/new/', views.start_new_conversation, name='start_new_conversation'),
     # --- KẾT THÚC URL MỚI ---
+    # --- URL MỚI ĐỂ TẠO THÔNG BÁO ---
+    path('notifications/create/', views.create_notification, name='create_notification'),
+    # --- KẾT THÚC URL MỚI ---
 
 ]

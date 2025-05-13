@@ -336,3 +336,128 @@ def start_new_conversation(request):
         'page_title': 'Bắt đầu Cuộc hội thoại mới',
     }
     return render(request, 'communications/start_new_conversation.html', context)
+
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
+from django.utils import timezone
+from django.db.models import Q, Max, Count
+
+from .models import Notification, RequestForm, Conversation, Message
+from accounts.models import User, Role # Import Role để xử lý recipient_group
+# from school_data.models import Class as SchoolClass # SchoolClass đã được import trong NotificationForm nếu cần
+from .forms import (
+    RequestFormSubmissionForm, 
+    RequestFormResponseForm, 
+    MessageForm, 
+    StartConversationForm,
+    NotificationForm # Import NotificationForm
+)
+
+
+# ... (các views notification_list, submit_request_form, my_submitted_requests,
+# department_request_list, department_request_detail_respond,
+# teacher_request_list, teacher_request_detail_respond,
+# conversation_list, conversation_detail, start_new_conversation đã có ở trên) ...
+
+@login_required
+def create_notification(request):
+    user = request.user
+    # Kiểm tra quyền: Chỉ Giáo viên, Quản lý Trường, hoặc Admin mới được tạo thông báo
+    allowed_roles = ['TEACHER', 'SCHOOL_ADMIN', 'ADMIN']
+    if not (hasattr(user, 'role') and user.role and user.role.name in allowed_roles):
+        raise PermissionDenied("Bạn không có quyền tạo thông báo.")
+
+    if request.method == 'POST':
+        form = NotificationForm(request.POST)
+        if form.is_valid():
+            notification = form.save(commit=False)
+            notification.sent_by = user
+            notification.status = 'SENT' # Hoặc 'DRAFT' nếu bạn muốn có bước xem lại/lên lịch
+            notification.is_published = True # Gửi ngay
+            notification.publish_time = timezone.now()
+            
+            # Lưu notification để có PK, sau đó mới gán ManyToManyFields
+            notification.save() 
+
+            # Xử lý recipient_group
+            recipient_group = form.cleaned_data.get('recipient_group')
+            if recipient_group:
+                if recipient_group == 'ALL_TEACHERS':
+                    teacher_role = Role.objects.filter(name='TEACHER').first()
+                    if teacher_role:
+                        notification.target_roles.add(teacher_role)
+                elif recipient_group == 'ALL_PARENTS':
+                    parent_role = Role.objects.filter(name='PARENT').first()
+                    if parent_role:
+                        notification.target_roles.add(parent_role)
+                elif recipient_group == 'ALL_STUDENTS':
+                    student_role = Role.objects.filter(name='STUDENT').first()
+                    if student_role:
+                        notification.target_roles.add(student_role)
+                # elif recipient_group == 'EVERYONE':
+                    # Logic cho EVERYONE: có thể thêm tất cả các vai trò chính,
+                    # hoặc để trống các target cụ thể và view notification_list sẽ hiểu là global.
+                    # Để đơn giản, nếu chọn EVERYONE, có thể không cần add cụ thể vào target_roles/classes/users
+                    # mà view notification_list sẽ có logic riêng để hiển thị.
+                    # Hoặc, thêm tất cả các vai trò chính:
+                    # main_roles = Role.objects.filter(name__in=['TEACHER', 'PARENT', 'STUDENT', 'SCHOOL_ADMIN'])
+                    # notification.target_roles.add(*main_roles)
+                    pass
+
+
+            # Xử lý các target cụ thể từ form (đã được ModelForm xử lý nếu fields đúng)
+            # ModelForm tự động xử lý ManyToManyFields nếu chúng có trong Meta.fields
+            # và form.save_m2m() được gọi (hoặc form.save() nếu commit=True ban đầu)
+            # Vì chúng ta đã gọi notification.save() ở trên, các M2M fields từ form
+            # (target_roles, target_classes, target_users) sẽ được gán khi form.save() được gọi lại
+            # hoặc nếu chúng ta dùng form.save_m2m()
+            # Tuy nhiên, cách tốt nhất là gán chúng một cách tường minh sau khi notification có PK.
+            
+            # Gán các target_roles từ trường chọn nhiều của form
+            # (ModelForm sẽ tự làm điều này nếu 'target_roles' có trong form.Meta.fields)
+            # Nếu bạn đã có trường recipient_group để thêm vào target_roles,
+            # và cũng có trường target_roles riêng, chúng sẽ được kết hợp.
+            # form.save_m2m() sẽ xử lý các trường M2M được định nghĩa trong Meta.fields.
+            # Vì chúng ta đã gọi notification.save() ở trên, các trường M2M này cần được lưu sau.
+            
+            # Lấy các lựa chọn từ form và thêm vào notification instance
+            # ModelForm.save() đã xử lý các trường M2M trong Meta.fields rồi.
+            # Nếu `recipient_group` thêm vào `target_roles`, nó sẽ được kết hợp.
+            # Chúng ta chỉ cần gọi save_m2m một lần nếu dùng commit=False ban đầu.
+            # Ở đây, vì `notification.save()` đã được gọi, các trường M2M từ `form.cleaned_data`
+            # (nếu có trong `Meta.fields` của form) sẽ được xử lý bởi `form.save()` tiếp theo
+            # hoặc nếu chúng ta gọi `form.save_m2m()` sau khi `notification` đã có ID.
+
+            # Để đảm bảo, chúng ta có thể gán lại các trường M2M từ form
+            # (mặc dù ModelForm thường đã làm điều này nếu 'target_roles', 'target_classes', 'target_users'
+            # là tên các trường M2M trong model Notification và có trong Meta.fields của NotificationForm)
+            
+            # Nếu bạn muốn thêm các role từ recipient_group và các role từ trường target_roles riêng:
+            # current_target_roles = set(form.cleaned_data.get('target_roles', Role.objects.none()))
+            # if teacher_role and recipient_group == 'ALL_TEACHERS': current_target_roles.add(teacher_role)
+            # ... (tương tự cho parent, student)
+            # notification.target_roles.set(list(current_target_roles))
+            
+            # ModelForm.save() sẽ xử lý các trường M2M nếu chúng được khai báo trong form.Meta.fields
+            # và chúng ta đã lưu instance chính `notification` trước.
+            # Không cần gọi save_m2m() nếu bạn không dùng commit=False với form.save() ban đầu.
+            # Tuy nhiên, vì chúng ta đã có notification.save() ở trên, và các trường M2M
+            # (target_roles, target_classes, target_users) có trong Meta.fields của NotificationForm,
+            # Django sẽ tự động xử lý chúng.
+            form.save_m2m()
+            messages.success(request, "Thông báo đã được tạo và gửi thành công!")
+            return redirect('communications:notification_list') # Hoặc trang chủ
+        else:
+            messages.error(request, "Vui lòng kiểm tra lại các lỗi trong form.")
+    else:
+        form = NotificationForm()
+
+    context = {
+        'form': form,
+        'page_title': 'Tạo Thông báo mới'
+    }
+    return render(request, 'communications/create_notification.html', context)
+
